@@ -1,0 +1,75 @@
+name: docs-site
+
+# Reusable workflow: lint, type-check and build a pnpm docs site, then upload the static export.
+# Call it from a project repo; see examples/ for callers.
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory holding the docs site (package.json, pnpm-lock.yaml, .nvmrc).
+        type: string
+        default: docs
+      required-outputs:
+        description: >-
+          Newline-separated paths, relative to working-directory, that must exist and be
+          non-empty after the build (e.g. out/llms.txt).
+        type: string
+        default: ''
+      artifact-name:
+        type: string
+        default: docs-out
+      artifact-path:
+        description: Build output to upload, relative to working-directory.
+        type: string
+        default: out
+      retention-days:
+        type: number
+        default: 7
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Docs (lint, types, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      # Actions are pinned to commit SHAs (tag in the comment); Dependabot proposes updates.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: ${{ inputs.working-directory }}/package.json
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ${{ inputs.working-directory }}/.nvmrc
+          cache: pnpm
+          cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm types:check
+      - run: pnpm build
+
+      - name: Check required build outputs exist
+        if: inputs.required-outputs != ''
+        env:
+          REQUIRED_OUTPUTS: ${{ inputs.required-outputs }}
+        run: |
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            test -s "$f" || { echo "Build output missing or empty: $f"; exit 1; }
+          done <<< "$REQUIRED_OUTPUTS"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.working-directory }}/${{ inputs.artifact-path }}
+          retention-days: ${{ inputs.retention-days }}

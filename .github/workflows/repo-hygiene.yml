@@ -1,0 +1,40 @@
+name: repo-hygiene
+
+# Reusable workflow: cheap repo-wide guardrails.
+
+on:
+  workflow_call:
+    inputs:
+      docs-sections-dir:
+        description: >-
+          If set, every subdirectory of this path must contain a meta.json
+          (Fumadocs sections), e.g. docs/content/docs.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: Repo hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: No secrets files tracked
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "A .env file is tracked. Keys belong in .env (gitignored); document them in .env.example."
+            exit 1
+          fi
+
+      - name: Every docs section has a meta.json
+        if: inputs.docs-sections-dir != ''
+        env:
+          SECTIONS_DIR: ${{ inputs.docs-sections-dir }}
+        run: |
+          for d in "$SECTIONS_DIR"/*/; do
+            test -f "${d}meta.json" || { echo "missing ${d}meta.json"; exit 1; }
+          done

@@ -1,0 +1,15 @@
+# Dependabot config can't be shared by reference; copy to .github/dependabot.yml in each repo.
+# The github-actions entry keeps SHA pins (including the gh-as-code reference) current.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+    groups:
+      docs-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
