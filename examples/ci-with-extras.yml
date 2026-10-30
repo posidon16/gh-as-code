@@ -1,0 +1,32 @@
+# Copy to .github/workflows/ci.yml in a consuming repo and adjust the inputs.
+# Pin to a commit SHA of a gh-as-code tag, with the tag in a comment; Dependabot proposes bumps.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Docs
+    uses: posidon16/gh-as-code/.github/workflows/docs-site.yml@<sha> # v1
+    with:
+      # Build outputs that must exist and be non-empty (paths relative to the docs directory).
+      required-outputs: |
+        out/llms.txt
+
+  hygiene:
+    name: Hygiene
+    uses: posidon16/gh-as-code/.github/workflows/repo-hygiene.yml@<sha> # v1
+    with:
+      docs-sections-dir: docs/content/docs
+
+  # Repo-specific jobs stay local.
